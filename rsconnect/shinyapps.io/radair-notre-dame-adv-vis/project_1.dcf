@@ -1,0 +1,12 @@
+name: project_1
+title: project_1
+username: radair-notre-dame-adv-vis
+account: radair-notre-dame-adv-vis
+server: shinyapps.io
+hostUrl: https://api.shinyapps.io/v1
+appId: 16282848
+bundleId: 11319883
+url: https://radair-notre-dame-adv-vis.shinyapps.io/project_1/
+version: 1
+asMultiple: FALSE
+asStatic: FALSE
