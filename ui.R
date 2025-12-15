@@ -1,4 +1,6 @@
 netrface
+# <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+# Load needed libraries
 library(tidyverse)
 library(ggplot2)
 library(leaflet)
@@ -9,7 +11,7 @@ library(bslib)
 library(viridis)
 library(plotly)
 
-
+# <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
 # Load and clean data
 abandon <- st_read("Abandoned_Property_Parcels/Abandoned_Property_Parcels.shp")
 abandon$Date_of_Ou <- as.Date(abandon$Date_of_Ou)
@@ -19,25 +21,24 @@ parks <- read_csv("Parks_Locations_and_Features.csv")
 school_sf <- st_read("South_Bend_School_Zones/South_Bend_School_Zones.shp")
 mgt_data <- read_csv("mgt_gip_data.csv")
 
-
 parks_sf <- parks %>%
   filter(!is.na(Lat), !is.na(Lon)) %>%
   st_as_sf(coords = c("Lon", "Lat"), crs = 4326, remove = FALSE)
-
 # Amenity columns (all except identifiers/coords)
 amenity_cols <- setdiff(names(parks_sf),
                         c("Park_Name","Park_Type","Zip_Code","Address","Lat","Lon","geometry"))
+# <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
 
 # User Inerface
 ui <- fluidPage(
-  theme = bs_theme(bootswatch = "cyborg"), 
+  theme = bs_theme(bootswatch = "cyborg"), # adding in dark theme for contrast due to amount of white space in charts
   titlePanel(
     div(
       "South Bend Abandon Property Outcome Explorer",
       style = "font-size: 24px; font-weight: bold;"
     )
   ),
-  
+  # Adding separate tabs to ensure functions like four separate pages 
   tabsetPanel(
     id = "tabs",
     # Tab 1 GIP Model Dashboard Tab (Andrew Benedum)
@@ -93,6 +94,7 @@ ui <- fluidPage(
                )
              )
     ),
+    # <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
     # Tab 2 General (Robert Adair)
     tabPanel("General",
              fluidPage(
@@ -138,8 +140,8 @@ ui <- fluidPage(
                       )
                      )
     ),
-    
-    # Tab 3 Parks and Amenities (Nicole Ho)
+    # <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+    # Tab 3 Parks and Amenities (Nicole Hernandez)
     tabPanel("Parks and Amenities",
              fluidPage(
                fluidRow(
@@ -182,7 +184,8 @@ ui <- fluidPage(
                     )
                    )
     ),
-    # # Tab 4 Properties and School Districts (Nicole Hernandez)
+    # <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+    # # Tab 4 Properties and School Districts (Nicole Ho)
     tabPanel("Properties and School Districts",
              fluidPage(
                fluidRow(
@@ -216,6 +219,7 @@ ui <- fluidPage(
                      )
                     )
                    )
+# <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
 # Server 
 server <- function(input, output, session) {
   # Tab 1 <<<<<<<<<<<<<
@@ -365,7 +369,7 @@ server <- function(input, output, session) {
       )
     
   }) 
-  # <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+  # <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
   # Tab 2
   # Page 2 filters
   filtered <- reactive({
@@ -378,7 +382,7 @@ server <- function(input, output, session) {
       )
 
   })
-  # 2. Summary table
+  # Summary table
   output$summaryTable <- renderTable({
     st_drop_geometry(filtered()) %>%
       count(Program_De, Code_Enfor) %>%
@@ -387,7 +391,7 @@ server <- function(input, output, session) {
              Count = n)
   })
   
-
+# Timeline line plot
   output$outcomePlot <- renderPlot({
     filtered() %>%
       count(Date_of_Ou) %>%
@@ -398,7 +402,7 @@ server <- function(input, output, session) {
       labs(title = paste("Timeline of", input$outcome, "Properties"),
            x = "Date", y = "Count")
   })
-  
+  # Structure type histogram using plotly to make interactive
   output$structurePlot <- renderPlotly({
     p <- filtered() %>%
       count(Structures) %>%
@@ -411,7 +415,7 @@ server <- function(input, output, session) {
     
     ggplotly(p)
   })
-  
+  # Map of properties to show reference of where they are for general reference. More detail will be added in later tabs
   output$mapPlot <- renderLeaflet({
     leaflet(data = filtered()) %>%
       addTiles() %>%
@@ -420,9 +424,8 @@ server <- function(input, output, session) {
         color = "#01018d", weight = 2, fillOpacity = 0.5
       )
   })
-  # <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+  # <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
   # Tab 3
-
   # Filters
   props_geo <- reactive({
     dat <- abandon_sf
@@ -451,7 +454,7 @@ server <- function(input, output, session) {
     palette = magma(length(parks$Park_Type)), 
     domain  = parks$Park_Type
   )
-  
+  # Map of abandoned properties and parks
   output$geoMap <- renderLeaflet({
     leaflet() %>%
       addTiles() %>%
@@ -489,7 +492,7 @@ server <- function(input, output, session) {
         values   = parks_geo()$Park_Type,
         title    = "Park Type"
       ) %>%
-      # measurement & drawing tools
+      # measurement tool
       addMeasure(
         position            = "topright",
         primaryLengthUnit   = "meters",
@@ -499,7 +502,7 @@ server <- function(input, output, session) {
       )
   })
 
-  # Amenity frequency chart
+  # Amenity frequency horizontal bar chart
   output$amenityFreq <- renderPlot({
     prks <- parks_geo()
     df <- prks %>%
@@ -516,7 +519,7 @@ server <- function(input, output, session) {
            x = "Amenity", y = "Number of Parks")
   })
   
-  # Park type breakdown
+  # Park type breakdown pie chart
   output$parkTypePlot <- renderPlot({
     prks <- parks_geo()
     df <- prks %>%
@@ -545,7 +548,7 @@ server <- function(input, output, session) {
       labs(title = "Distribution of Amenity Richness per Park",
            x = "Number of Amenities", y = "Count of Parks")
   })
-  # <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+  # <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
   # Tab 4
   # Filtered abandoned properties
   filtered_abandoned <- reactive({
@@ -556,7 +559,7 @@ server <- function(input, output, session) {
     data
   })
   
-  # Convert abandoned polygons to centroids for mapping
+  # Convert abandoned polygons to points of center of shape for mapping
   abandon_centroids <- reactive({
     filtered_abandoned() %>%
       st_centroid() %>%
@@ -566,7 +569,7 @@ server <- function(input, output, session) {
       )
   })
   
-  # Filtered schools by type AND zipcode
+  # Filtered schools by type and zipcode
   filtered_schools <- reactive({
     data <- school_sf
     
@@ -575,7 +578,7 @@ server <- function(input, output, session) {
       data <- data %>% filter(Type == input$school_type)
     }
     
-    # Filter by zipcode - only show districts that contain abandoned properties in selected zipcodes
+    # Filter by zipcode 
     if (!is.null(input$zip_filter) && length(input$zip_filter) > 0) {
       # Get the spatial union of abandoned properties in selected zipcodes
       zip_bounds <- filtered_abandoned() %>% st_union()
@@ -591,7 +594,7 @@ server <- function(input, output, session) {
     st_join(filtered_abandoned(), filtered_schools(), join = st_intersects)
   })
   
-  # Map
+  # Map of school districts shapes with abandon properties points
   output$school_map <- renderLeaflet({
     leaflet() %>%
       addProviderTiles("CartoDB.Positron") %>%
@@ -622,7 +625,7 @@ server <- function(input, output, session) {
       st_drop_geometry() %>%
       count(SchoolName) %>%
       mutate(
-        SchoolAbbrev = substr(SchoolName, 1, 20)  # First 20 characters
+        SchoolAbbrev = substr(SchoolName, 1, 20)  # Abbreviating the first 20 characters for space management
       ) %>%
       plot_ly(
         x = ~SchoolAbbrev,
@@ -640,7 +643,7 @@ server <- function(input, output, session) {
         height = 300
       )
   })
-  # Property outcomes by school district
+  # Property outcomes by school district interactive stacked bar chart
   output$outcomes_by_district <- renderPlotly({
     abandoned_in_district() %>%
       st_drop_geometry() %>%
@@ -662,5 +665,6 @@ server <- function(input, output, session) {
       )
   })
 }
+# Running the shiny app
 # Specifying height to ensure full screen output when rendering
 shinyApp(ui = ui, server = server, options = list(height = 1080))
