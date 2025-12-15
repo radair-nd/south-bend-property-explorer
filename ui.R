@@ -1,4 +1,4 @@
-
+netrface
 library(tidyverse)
 library(ggplot2)
 library(leaflet)
@@ -28,7 +28,7 @@ parks_sf <- parks %>%
 amenity_cols <- setdiff(names(parks_sf),
                         c("Park_Name","Park_Type","Zip_Code","Address","Lat","Lon","geometry"))
 
-
+# User Inerface
 ui <- fluidPage(
   theme = bs_theme(bootswatch = "cyborg"), 
   titlePanel(
@@ -40,7 +40,7 @@ ui <- fluidPage(
   
   tabsetPanel(
     id = "tabs",
-    # Tab 1 GIP Model Dashboard Tab
+    # Tab 1 GIP Model Dashboard Tab (Andrew Benedum)
     tabPanel("GIP Model",
              fluidPage(
                fluidRow(
@@ -93,7 +93,7 @@ ui <- fluidPage(
                )
              )
     ),
-    # Tab 2 General
+    # Tab 2 General (Robert Adair)
     tabPanel("General",
              fluidPage(
                fluidRow(
@@ -132,14 +132,14 @@ ui <- fluidPage(
                           column(width = 6,
                                  h4("Map of Selected Properties"),
                                  leafletOutput("mapPlot", height = 300)
-                          )
+                         )
                         )
-                 )
-               )
-             )
+                       )
+                      )
+                     )
     ),
     
-    # Tab 3 Parks and Amenities
+    # Tab 3 Parks and Amenities (Nicole Ho)
     tabPanel("Parks and Amenities",
              fluidPage(
                fluidRow(
@@ -154,7 +154,7 @@ ui <- fluidPage(
                           selected = unique(parks$Park_Type), 
                           inline   = FALSE                     
                         )
-                 ),
+                      ),
                  
                  column(width = 9,
                         fluidRow(
@@ -176,13 +176,13 @@ ui <- fluidPage(
                           column(width = 6,
                                  h6("Counts of parks and properties"),
                                  leafletOutput("geoMap", height = 300)
-                          )
-                        )
-                 )
-               )
-             )
+                       )
+                      )
+                     )
+                    )
+                   )
     ),
-    # # Tab 4 Properties and School Districts
+    # # Tab 4 Properties and School Districts (Nicole Hernandez)
     tabPanel("Properties and School Districts",
              fluidPage(
                fluidRow(
@@ -216,306 +216,9 @@ ui <- fluidPage(
                      )
                     )
                    )
-
+# Server 
 server <- function(input, output, session) {
-  
-  # # Page 1 filters
-  filtered <- reactive({
-    abandon_sf %>%
-      filter(
-        Outcome_St == input$outcome,
-        Zip_Code %in% input$zip,
-        year(Date_of_Ou) >= input$yearRange[1],
-        year(Date_of_Ou) <= input$yearRange[2]
-      )
-
-  })
-  # 2. Summary table
-  output$summaryTable <- renderTable({
-    st_drop_geometry(filtered()) %>%
-      count(Program_De, Code_Enfor) %>%
-      rename(`Program Description` = Program_De,
-             `Code Enforcement Status` = Code_Enfor,
-             Count = n)
-  })
-  
-
-  output$outcomePlot <- renderPlot({
-    filtered() %>%
-      count(Date_of_Ou) %>%
-      ggplot(aes(x = Date_of_Ou, y = n)) +
-      geom_line(color = "#FFAA01", size = 0.9) +
-      geom_point() +
-      theme_minimal() +
-      labs(title = paste("Timeline of", input$outcome, "Properties"),
-           x = "Date", y = "Count")
-  })
-  
-  output$structurePlot <- renderPlotly({
-    p <- filtered() %>%
-      count(Structures) %>%
-      ggplot(aes(x = reorder(Structures, n), y = n)) +
-      geom_bar(stat = "identity", fill = "#0074cc") +
-      coord_flip() +
-      theme_minimal() +
-      labs(title = "Types of Structures Involved",
-           x = "Structure Type", y = "Count")
-    
-    ggplotly(p)
-  })
-  
-  output$mapPlot <- renderLeaflet({
-    leaflet(data = filtered()) %>%
-      addTiles() %>%
-      addPolygons(
-        popup = ~paste(Address_Nu, Street_Nam, Suffix),
-        color = "#01018d", weight = 2, fillOpacity = 0.5
-      )
-  })
-
-  # Page 2 filters
-  props_geo <- reactive({
-    dat <- abandon_sf
-    if (!is.null(input$zipGeo) && length(input$zipGeo) > 0) {
-      dat <- dat %>% filter(Zip_Code %in% input$zipGeo)
-    }
-    dat
-  })
-  
-
-  parks_geo <- reactive({
-    dat <- parks_sf
-    # ZIP filter
-    if (!is.null(input$zipGeo) && length(input$zipGeo) > 0) {
-      dat <- dat %>% filter(Zip_Code %in% input$zipGeo)
-    }
-    # Park type filter
-    if (!is.null(input$parkType) && length(input$parkType) > 0) {
-      dat <- dat %>% filter(Park_Type %in% input$parkType)
-    }
-    
-    dat
-  })
-  
-# Setting up color palette that sensitive to color blindness
-  pal <- colorFactor(
-    palette = magma(length(parks$Park_Type)), 
-    domain  = parks$Park_Type
-  )
-  
-  output$geoMap <- renderLeaflet({
-    leaflet() %>%
-      addTiles() %>%
-      # Abandoned parcels layer
-      addPolygons(
-        data        = props_geo(),
-        color       = "navy",
-        weight      = 2,
-        fillOpacity = 0.3,
-        group       = "Abandoned Parcels",
-        popup       = ~paste0("<b>", Address_Nu, " ", Street_Nam, Suffix, "</b>")
-      ) %>%
-      # Parks layer with fillColor mapped by Park_Type
-      addCircleMarkers(
-        data        = parks_geo(),
-        lng         = ~Lon,
-        lat         = ~Lat,
-        radius      = 4,
-        color       = "black",           # marker border
-        weight      = 1,
-        fillColor   = ~pal(Park_Type),   # fill mapped to park type
-        fillOpacity = 0.8,
-        popup       = ~paste0("<b>", Park_Name, "</b><br/>", Park_Type),
-        group       = "Parks"
-      ) %>%
-      # Layers control
-      addLayersControl(
-        overlayGroups = c("Abandoned Parcels", "Parks"),
-        options       = layersControlOptions(collapsed = FALSE)
-      ) %>%
-      # Legend for Park_Type
-      addLegend(
-        position = "bottomleft",
-        pal      = pal,
-        values   = parks_geo()$Park_Type,
-        title    = "Park Type"
-      ) %>%
-      # measurement & drawing tools
-      addMeasure(
-        position            = "topright",
-        primaryLengthUnit   = "meters",
-        secondaryLengthUnit = "miles",
-        activeColor         = "red",
-        completedColor      = "green"
-      )
-  })
-
-  # Amenity frequency chart
-  output$amenityFreq <- renderPlot({
-    prks <- parks_geo()
-    df <- prks %>%
-      st_drop_geometry() %>%
-      summarise(across(all_of(amenity_cols), ~ sum(. == 1, na.rm = TRUE))) %>%
-      pivot_longer(everything(), names_to = "Amenity", values_to = "Count") %>%
-      filter(Count > 0)
-    
-    ggplot(df, aes(x = reorder(Amenity, Count), y = Count)) +
-      geom_col(fill = "#2323FF") +
-      coord_flip() +
-      theme_minimal() +
-      labs(title = "Frequency of Amenities in Filtered Parks",
-           x = "Amenity", y = "Number of Parks")
-  })
-  
-  # Park type breakdown
-  output$parkTypePlot <- renderPlot({
-    prks <- parks_geo()
-    df <- prks %>%
-      st_drop_geometry() %>%
-      count(Park_Type)
-
-    ggplot(df, aes(x = "", y = n, fill = Park_Type)) +
-      geom_col(width = 1) +
-      coord_polar("y") +
-      scale_fill_viridis_d(option = "turbo") +
-      theme_void() +
-      labs(title = "Park Type Breakdown") +
-      theme(legend.position = "right")
-  })
-
-  # Amenity richness histogram
-  output$amenityRichness <- renderPlot({
-    prks <- parks_geo()
-    df <- prks %>%
-      st_drop_geometry() %>%
-      mutate(AmenityCount = rowSums(select(., all_of(amenity_cols)) == 1, na.rm = TRUE))
-    
-    ggplot(df, aes(x = AmenityCount)) +
-      geom_histogram(binwidth = 1, fill = "#2323FF", color = "black") +
-      theme_minimal() +
-      labs(title = "Distribution of Amenity Richness per Park",
-           x = "Number of Amenities", y = "Count of Parks")
-  })
-  
-  
-  # Filtered abandoned properties
-  filtered_abandoned <- reactive({
-    data <- abandon_sf
-    if (!is.null(input$zip_filter) && length(input$zip_filter) > 0) {
-      data <- data %>% filter(as.character(Zip_Code) %in% as.character(input$zip_filter))
-    }
-    data
-  })
-  
-  # Convert abandoned polygons to centroids for mapping
-  abandon_centroids <- reactive({
-    filtered_abandoned() %>%
-      st_centroid() %>%
-      mutate(
-        lon = st_coordinates(.)[,1],
-        lat = st_coordinates(.)[,2]
-      )
-  })
-  
-  # Filtered schools by type AND zipcode
-  filtered_schools <- reactive({
-    data <- school_sf
-    
-    # Filter by school type
-    if (input$school_type != "All") {
-      data <- data %>% filter(Type == input$school_type)
-    }
-    
-    # Filter by zipcode - only show districts that contain abandoned properties in selected zipcodes
-    if (!is.null(input$zip_filter) && length(input$zip_filter) > 0) {
-      # Get the spatial union of abandoned properties in selected zipcodes
-      zip_bounds <- filtered_abandoned() %>% st_union()
-      # Only keep school districts that intersect with those zipcodes
-      data <- data[st_intersects(data, zip_bounds, sparse = FALSE),]
-    }
-    
-    data
-  })
-
-  
-  # Spatial join: abandoned properties within school district polygons
-  abandoned_in_district <- reactive({
-    st_join(filtered_abandoned(), filtered_schools(), join = st_intersects)
-  })
-  
-  # Leaflet map
-  output$school_map <- renderLeaflet({
-    leaflet() %>%
-      addProviderTiles("CartoDB.Positron") %>%
-      addPolygons(
-        data = filtered_schools(),
-        color = "blue", 
-        weight = 2, 
-        fillOpacity = 0.3,
-        popup = ~paste(SchoolName, "<br>", Type)
-      ) %>%
-      {
-        if (isTRUE(input$show_abandoned)) {
-          addCircleMarkers(
-            .,
-            data = abandon_centroids(),
-            lng = ~lon, 
-            lat = ~lat,
-            radius = 4, 
-            color = "orange",
-            popup = ~paste0(Address_Nu, " ", Direction, " ", Street_Nam)
-          )
-        } else .
-      }
-  })
-  
-  output$abandon_density_chart <- renderPlotly({
-    abandoned_in_district() %>%
-      st_drop_geometry() %>%
-      count(SchoolName) %>%
-      mutate(
-        SchoolAbbrev = substr(SchoolName, 1, 20)  # First 20 characters
-      ) %>%
-      plot_ly(
-        x = ~SchoolAbbrev,
-        y = ~n,
-        type = "bar",
-        name = "Abandoned Properties",
-        marker = list(color = "#0074cc"),
-        hovertemplate = "<b>%{customdata}</b><br>Count: %{y}<extra></extra>",
-        customdata = ~SchoolName
-      ) %>%
-      layout(
-        xaxis = list(title = "", tickangle = -45, tickfont = list(size = 8)),
-        yaxis = list(title = "Count"),
-        margin = list(l = 40, r = 20, b = 100, t = 30),
-        height = 300
-      )
-  })
-  # Property outcomes by school district
-  output$outcomes_by_district <- renderPlotly({
-    abandoned_in_district() %>%
-      st_drop_geometry() %>%
-      count(SchoolName, Outcome_St) %>%
-      plot_ly(
-        x = ~SchoolName,
-        y = ~n,
-        color = ~Outcome_St,
-        type = "bar",
-        hovertemplate = "<b>%{x}</b><br>%{fullData.name}: %{y}<extra></extra>"
-      ) %>%
-      layout(
-        xaxis = list(title = "School District", tickangle = -45),
-        yaxis = list(title = "Count"),
-        barmode = "stack",
-        margin = list(b = 120),
-        height = 350,
-        legend = list(orientation = "v", x = 1.02, y = 1)
-      )
-  })
-
-  
-  # Page 3
+  # Tab 1 <<<<<<<<<<<<<
   # Load the GIP data
   mgt_data <- read_csv("mgt_gip_data.csv")
   
@@ -661,7 +364,303 @@ server <- function(input, output, session) {
         legend.position = "none"
       )
     
+  }) 
+  # <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+  # Tab 2
+  # Page 2 filters
+  filtered <- reactive({
+    abandon_sf %>%
+      filter(
+        Outcome_St == input$outcome,
+        Zip_Code %in% input$zip,
+        year(Date_of_Ou) >= input$yearRange[1],
+        year(Date_of_Ou) <= input$yearRange[2]
+      )
+
+  })
+  # 2. Summary table
+  output$summaryTable <- renderTable({
+    st_drop_geometry(filtered()) %>%
+      count(Program_De, Code_Enfor) %>%
+      rename(`Program Description` = Program_De,
+             `Code Enforcement Status` = Code_Enfor,
+             Count = n)
+  })
+  
+
+  output$outcomePlot <- renderPlot({
+    filtered() %>%
+      count(Date_of_Ou) %>%
+      ggplot(aes(x = Date_of_Ou, y = n)) +
+      geom_line(color = "#FFAA01", size = 0.9) +
+      geom_point() +
+      theme_minimal() +
+      labs(title = paste("Timeline of", input$outcome, "Properties"),
+           x = "Date", y = "Count")
+  })
+  
+  output$structurePlot <- renderPlotly({
+    p <- filtered() %>%
+      count(Structures) %>%
+      ggplot(aes(x = reorder(Structures, n), y = n)) +
+      geom_bar(stat = "identity", fill = "#0074cc") +
+      coord_flip() +
+      theme_minimal() +
+      labs(title = "Types of Structures Involved",
+           x = "Structure Type", y = "Count")
+    
+    ggplotly(p)
+  })
+  
+  output$mapPlot <- renderLeaflet({
+    leaflet(data = filtered()) %>%
+      addTiles() %>%
+      addPolygons(
+        popup = ~paste(Address_Nu, Street_Nam, Suffix),
+        color = "#01018d", weight = 2, fillOpacity = 0.5
+      )
+  })
+  # <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+  # Tab 3
+
+  # Filters
+  props_geo <- reactive({
+    dat <- abandon_sf
+    if (!is.null(input$zipGeo) && length(input$zipGeo) > 0) {
+      dat <- dat %>% filter(Zip_Code %in% input$zipGeo)
+    }
+    dat
+  })
+  
+  parks_geo <- reactive({
+    dat <- parks_sf
+    # ZIP filter
+    if (!is.null(input$zipGeo) && length(input$zipGeo) > 0) {
+      dat <- dat %>% filter(Zip_Code %in% input$zipGeo)
+    }
+    # Park type filter
+    if (!is.null(input$parkType) && length(input$parkType) > 0) {
+      dat <- dat %>% filter(Park_Type %in% input$parkType)
+    }
+    
+    dat
+  })
+  
+# Setting up color palette that sensitive to color blindness
+  pal <- colorFactor(
+    palette = magma(length(parks$Park_Type)), 
+    domain  = parks$Park_Type
+  )
+  
+  output$geoMap <- renderLeaflet({
+    leaflet() %>%
+      addTiles() %>%
+      # Abandoned parcels layer
+      addPolygons(
+        data        = props_geo(),
+        color       = "navy",
+        weight      = 2,
+        fillOpacity = 0.3,
+        group       = "Abandoned Parcels",
+        popup       = ~paste0("<b>", Address_Nu, " ", Street_Nam, Suffix, "</b>")
+      ) %>%
+      # Parks layer with fillColor mapped by Park_Type
+      addCircleMarkers(
+        data        = parks_geo(),
+        lng         = ~Lon,
+        lat         = ~Lat,
+        radius      = 4,
+        color       = "black",           # marker border
+        weight      = 1,
+        fillColor   = ~pal(Park_Type),   # fill mapped to park type
+        fillOpacity = 0.8,
+        popup       = ~paste0("<b>", Park_Name, "</b><br/>", Park_Type),
+        group       = "Parks"
+      ) %>%
+      # Layers control
+      addLayersControl(
+        overlayGroups = c("Abandoned Parcels", "Parks"),
+        options       = layersControlOptions(collapsed = FALSE)
+      ) %>%
+      # Legend for Park_Type
+      addLegend(
+        position = "bottomleft",
+        pal      = pal,
+        values   = parks_geo()$Park_Type,
+        title    = "Park Type"
+      ) %>%
+      # measurement & drawing tools
+      addMeasure(
+        position            = "topright",
+        primaryLengthUnit   = "meters",
+        secondaryLengthUnit = "miles",
+        activeColor         = "red",
+        completedColor      = "green"
+      )
+  })
+
+  # Amenity frequency chart
+  output$amenityFreq <- renderPlot({
+    prks <- parks_geo()
+    df <- prks %>%
+      st_drop_geometry() %>%
+      summarise(across(all_of(amenity_cols), ~ sum(. == 1, na.rm = TRUE))) %>%
+      pivot_longer(everything(), names_to = "Amenity", values_to = "Count") %>%
+      filter(Count > 0)
+    
+    ggplot(df, aes(x = reorder(Amenity, Count), y = Count)) +
+      geom_col(fill = "#2323FF") +
+      coord_flip() +
+      theme_minimal() +
+      labs(title = "Frequency of Amenities in Filtered Parks",
+           x = "Amenity", y = "Number of Parks")
+  })
+  
+  # Park type breakdown
+  output$parkTypePlot <- renderPlot({
+    prks <- parks_geo()
+    df <- prks %>%
+      st_drop_geometry() %>%
+      count(Park_Type)
+
+    ggplot(df, aes(x = "", y = n, fill = Park_Type)) +
+      geom_col(width = 1) +
+      coord_polar("y") +
+      scale_fill_viridis_d(option = "turbo") +
+      theme_void() +
+      labs(title = "Park Type Breakdown") +
+      theme(legend.position = "right")
+  })
+
+  # Amenity richness histogram
+  output$amenityRichness <- renderPlot({
+    prks <- parks_geo()
+    df <- prks %>%
+      st_drop_geometry() %>%
+      mutate(AmenityCount = rowSums(select(., all_of(amenity_cols)) == 1, na.rm = TRUE))
+    
+    ggplot(df, aes(x = AmenityCount)) +
+      geom_histogram(binwidth = 1, fill = "#2323FF", color = "black") +
+      theme_minimal() +
+      labs(title = "Distribution of Amenity Richness per Park",
+           x = "Number of Amenities", y = "Count of Parks")
+  })
+  # <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+  # Tab 4
+  # Filtered abandoned properties
+  filtered_abandoned <- reactive({
+    data <- abandon_sf
+    if (!is.null(input$zip_filter) && length(input$zip_filter) > 0) {
+      data <- data %>% filter(as.character(Zip_Code) %in% as.character(input$zip_filter))
+    }
+    data
+  })
+  
+  # Convert abandoned polygons to centroids for mapping
+  abandon_centroids <- reactive({
+    filtered_abandoned() %>%
+      st_centroid() %>%
+      mutate(
+        lon = st_coordinates(.)[,1],
+        lat = st_coordinates(.)[,2]
+      )
+  })
+  
+  # Filtered schools by type AND zipcode
+  filtered_schools <- reactive({
+    data <- school_sf
+    
+    # Filter by school type
+    if (input$school_type != "All") {
+      data <- data %>% filter(Type == input$school_type)
+    }
+    
+    # Filter by zipcode - only show districts that contain abandoned properties in selected zipcodes
+    if (!is.null(input$zip_filter) && length(input$zip_filter) > 0) {
+      # Get the spatial union of abandoned properties in selected zipcodes
+      zip_bounds <- filtered_abandoned() %>% st_union()
+      # Only keep school districts that intersect with those zipcodes
+      data <- data[st_intersects(data, zip_bounds, sparse = FALSE),]
+    }
+    
+    data
+  })
+
+  # Spatial join abandoned properties within school district polygons to get a zip code semi match
+  abandoned_in_district <- reactive({
+    st_join(filtered_abandoned(), filtered_schools(), join = st_intersects)
+  })
+  
+  # Map
+  output$school_map <- renderLeaflet({
+    leaflet() %>%
+      addProviderTiles("CartoDB.Positron") %>%
+      addPolygons(
+        data = filtered_schools(),
+        color = "blue", 
+        weight = 2, 
+        fillOpacity = 0.3,
+        popup = ~paste(SchoolName, "<br>", Type)
+      ) %>%
+      {
+        if (isTRUE(input$show_abandoned)) {
+          addCircleMarkers(
+            .,
+            data = abandon_centroids(),
+            lng = ~lon, 
+            lat = ~lat,
+            radius = 4, 
+            color = "orange",
+            popup = ~paste0(Address_Nu, " ", Direction, " ", Street_Nam)
+          )
+        } else .
+      }
+  })
+  
+  output$abandon_density_chart <- renderPlotly({
+    abandoned_in_district() %>%
+      st_drop_geometry() %>%
+      count(SchoolName) %>%
+      mutate(
+        SchoolAbbrev = substr(SchoolName, 1, 20)  # First 20 characters
+      ) %>%
+      plot_ly(
+        x = ~SchoolAbbrev,
+        y = ~n,
+        type = "bar",
+        name = "Abandoned Properties",
+        marker = list(color = "#0074cc"),
+        hovertemplate = "<b>%{customdata}</b><br>Count: %{y}<extra></extra>",
+        customdata = ~SchoolName
+      ) %>%
+      layout(
+        xaxis = list(title = "", tickangle = -45, tickfont = list(size = 8)),
+        yaxis = list(title = "Count"),
+        margin = list(l = 40, r = 20, b = 100, t = 30),
+        height = 300
+      )
+  })
+  # Property outcomes by school district
+  output$outcomes_by_district <- renderPlotly({
+    abandoned_in_district() %>%
+      st_drop_geometry() %>%
+      count(SchoolName, Outcome_St) %>%
+      plot_ly(
+        x = ~SchoolName,
+        y = ~n,
+        color = ~Outcome_St,
+        type = "bar",
+        hovertemplate = "<b>%{x}</b><br>%{fullData.name}: %{y}<extra></extra>"
+      ) %>%
+      layout(
+        xaxis = list(title = "School District", tickangle = -45),
+        yaxis = list(title = "Count"),
+        barmode = "stack",
+        margin = list(b = 120),
+        height = 350,
+        legend = list(orientation = "v", x = 1.02, y = 1)
+      )
   })
 }
-
+# Specifying height to ensure full screen output when rendering
 shinyApp(ui = ui, server = server, options = list(height = 1080))
